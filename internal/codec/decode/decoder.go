@@ -1,0 +1,85 @@
+package decode
+
+import (
+	"errors"
+	"image_codec/internal/codec/serialization"
+	"image_codec/internal/models"
+)
+
+func deltaDecode(input []models.DeltaEncodedElement) []models.Pixel {
+	result := make([]models.Pixel, len(input))
+
+	result[0].R = byte(input[0].R)
+	result[0].G = byte(input[0].G)
+	result[0].B = byte(input[0].B)
+
+	for i := 1; i < len(input); i++ {
+		result[i].R = result[i-1].R + byte(input[i].R)
+		result[i].G = result[i-1].G + byte(input[i].G)
+		result[i].B = result[i-1].B + byte(input[i].B)
+	}
+
+	return result
+}
+
+func rleDecode(input []models.RLEEncodedElement) []models.DeltaEncodedElement {
+	var result []models.DeltaEncodedElement
+	var element models.DeltaEncodedElement
+	var toFill byte
+
+	for _, v := range input {
+		toFill = v.Count
+		
+		element.R = v.Value.R
+		element.G = v.Value.G
+		element.B = v.Value.B
+
+		for toFill > 0 {
+			result = append(result, element)
+			toFill--
+		}
+	}
+
+	return result
+}
+
+func Decode(width, height uint16, input []byte) ([]byte, error) {
+	// Десериализация
+	inputRLEEncodedPixels := serialization.Deserialize(input)
+
+	// RLE-декодирование
+	inputDeltaEncodedPixels := rleDecode(inputRLEEncodedPixels)
+
+	// Проверка первого пикселя
+	if inputDeltaEncodedPixels[0].R < 0 || inputDeltaEncodedPixels[0].R > 255 {
+		return nil, errors.New("некорректный первый пиксель канала R")
+	}
+	if inputDeltaEncodedPixels[0].G < 0 || inputDeltaEncodedPixels[0].G > 255 {
+		return nil, errors.New("некорректный первый пиксель канала G")
+	}
+	if inputDeltaEncodedPixels[0].B < 0 || inputDeltaEncodedPixels[0].B > 255 {
+		return nil, errors.New("некорректный первый пиксель канала B")
+	}
+
+	// Дельта-декодирование
+	inputRawPixels := deltaDecode(inputDeltaEncodedPixels)
+
+	valuesTotal := len(inputRawPixels)*3
+	valueIndex := 0
+	result := make([]byte, valuesTotal)
+
+	for _, v := range inputRawPixels {
+		result[valueIndex] = v.R
+		result[valueIndex+1] = v.G
+		result[valueIndex+2] = v.B
+
+		valueIndex += 3
+	}
+
+	// Проверка кол-ва данных
+	if count := int(width)*int(height)*3; count != len(result) {
+		return nil, errors.New("некорректное кол-во элементов")
+	}
+
+	return result, nil
+}
