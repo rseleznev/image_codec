@@ -49,30 +49,10 @@ func rleEncode(input []models.DeltaEncodedElement) []models.RLEEncodedElement {
 	return result
 }
 
-func buildHaffmanCodes(input map[byte]float32) {
-	result := make([]models.HaffmanEncodedElement, 256)
-	var value byte
-	var freq float32
+func buildHaffmanCodes(input map[byte]int) {
+	// Нужно писать кучу и функции для работы с ней
 
-	for i := 0; i < 256; i++ {
-		
-		for k, v := range input {
-			if v > freq {
-				value = k
-				freq = v
-			}
-		}
-
-		result[i] = models.HaffmanEncodedElement{
-			Value: value,
-			Freq: freq,
-		}
-		delete(input, value)
-		value = 0
-		freq = 0
-	}
-
-	fmt.Println(result)
+	fmt.Println(input)
 }
 
 func Encode(width, height int, input []byte) ([]byte, error) {
@@ -118,9 +98,9 @@ func Encode(width, height int, input []byte) ([]byte, error) {
 
 	// Коды Хаффмана
 	// Считаем частоту вхождения байтов
-	byteFreq := make(map[byte]float32, 256)
+	byteFreq := make(map[byte]int, 256)
 	for _, v := range serialized {
-		byteFreq[v] += 1 * 100 / float32(len(serialized))
+		byteFreq[v]++
 	}
 
 	buildHaffmanCodes(byteFreq)

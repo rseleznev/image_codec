@@ -35,8 +35,9 @@ type FileHeader struct {
 	DataSize uint32
 }
 
-type HaffmanEncodedElement struct {
+type Node struct {
 	Value byte
-	Freq float32
-	Bits uint64
+	Freq int
+	LeftNode *Node
+	RightNode *Node
 }
