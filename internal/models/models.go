@@ -35,9 +35,10 @@ type FileHeader struct {
 	DataSize uint32
 }
 
-type Node struct {
+type HeapElement struct {
+	Name string
 	Value byte
 	Freq int
-	LeftNode *Node
-	RightNode *Node
+	LeftChild *HeapElement
+	RightChild *HeapElement
 }

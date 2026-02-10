@@ -49,10 +49,113 @@ func rleEncode(input []models.DeltaEncodedElement) []models.RLEEncodedElement {
 	return result
 }
 
-func buildHaffmanCodes(input map[byte]int) {
-	// Нужно писать кучу и функции для работы с ней
+type minHeap []models.HeapElement
 
-	fmt.Println(input)
+func (mH minHeap) AddNewElement(element models.HeapElement) minHeap {
+	mH = append(mH, element)
+
+	if len(mH) > 1 {
+		mH.RecoverUp(len(mH)-1)
+	}
+	return mH
+}
+
+func (mH minHeap) RecoverUp(index int) {
+	if index == 0 {
+		return
+	}
+	
+	newElementIndex := index
+	parentElementIndex := (index-1)/2
+
+	if mH[parentElementIndex].Freq > mH[newElementIndex].Freq {
+		recoveredIndex := mH.SwapElements(parentElementIndex, newElementIndex)
+		mH.RecoverUp(recoveredIndex)
+	}
+}
+
+func (mH minHeap) SwapElements(parentIndex, childIndex int) int {
+	parentElement := mH[parentIndex]
+	childElement := mH[childIndex]
+
+	mH[parentIndex] = childElement
+	mH[childIndex] = parentElement
+
+	return parentIndex
+}
+
+func (mH minHeap) CheckIfHeapIsValid() bool {
+	// Временная заглушка
+	if len(mH) < 3 {
+		return true
+	}
+	
+	if mH[0].Freq > mH[1].Freq || mH[0].Freq > mH[2].Freq {
+		return false
+	}
+
+	checkingStack := []int{}
+	checkingStack = append(checkingStack, 1)
+	result := true
+
+	for len(checkingStack) > 1 {
+		checkingIndex := checkingStack[len(checkingStack)]
+		checkingStack = checkingStack[:0]
+
+		if checkingIndex == len(mH)-1 {
+			// Последний элемент кучи, нет потомков
+			break
+		}
+
+		leftChildIndex := 2*checkingIndex + 1
+		rightChildIndex := 2*checkingIndex + 2
+
+		// Если есть левый потомок
+		if leftChildIndex <= len(mH)-1 {
+			// Проверяем левого потомка
+			if mH[checkingIndex].Freq > mH[leftChildIndex].Freq {
+				result = false
+				break
+			}
+			// Закидываем левого потомка в очередь на проверку
+			checkingStack = append(checkingStack, leftChildIndex)
+		}
+
+		// Если есть правый потомок
+		if rightChildIndex <= len(mH)-1 {
+			// Проверяем правого потомка
+			if mH[checkingIndex].Freq > mH[rightChildIndex].Freq {
+				result = false
+				break
+			}
+			// Закидываем правого потомка в очередь на проверку
+			checkingStack = append(checkingStack, rightChildIndex)
+		}
+	}
+
+	return result
+}
+
+func buildHaffmanCodes(input []byte) {
+	bytesFreq := make(map[byte]int, 256)
+
+	for _, v := range input {
+		bytesFreq[v]++
+	}
+
+	var result minHeap
+
+	for k, v := range bytesFreq {
+		result = result.AddNewElement(models.HeapElement{
+			Value: k,
+			Freq: v,
+		})
+	}
+
+	check := result.CheckIfHeapIsValid()
+
+	fmt.Println(result)
+	fmt.Println(check)
 }
 
 func Encode(width, height int, input []byte) ([]byte, error) {
@@ -97,13 +200,7 @@ func Encode(width, height int, input []byte) ([]byte, error) {
 	fmt.Println("Сериализовано данных:", len(serialized))
 
 	// Коды Хаффмана
-	// Считаем частоту вхождения байтов
-	byteFreq := make(map[byte]int, 256)
-	for _, v := range serialized {
-		byteFreq[v]++
-	}
-
-	buildHaffmanCodes(byteFreq)
+	buildHaffmanCodes(serialized)
 
 	return serialized, nil
 }
