@@ -21,7 +21,7 @@
 * encode -width={} -height={} -inputFile={} -outputFile={}
   * Кодирует байты из inputFile (нужен RAW файл) в размерах width/height в outputFile
 * decode -sourceFile={}
-  * Декодирует байты из sourceFile (.rmz файл), восстанавливает исходное изображение
+  * Декодирует байты из sourceFile (.rmz файл), восстанавливает исходные байты
 * view -sourceFile={}
   * Открывает указанный .rmz файл в кастомном просмотрщике
 
@@ -70,4 +70,10 @@ update-mime-database ~/.local/share/mime
 
 ```bash
 xdg-mime default rmz-viewer.desktop image/x-rmz
+```
+
+* Конвертировать JPEG в RAW
+
+```bash
+convert input.jpg -depth 8 rgb:output.raw
 ```

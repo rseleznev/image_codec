@@ -36,7 +36,6 @@ type FileHeader struct {
 }
 
 type HeapElement struct {
-	Name string
 	Value byte
 	Freq int
 	LeftChild *HeapElement
