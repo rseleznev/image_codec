@@ -36,8 +36,19 @@ type FileHeader struct {
 }
 
 type HeapElement struct {
+	Type string
 	Value byte
 	Freq int
 	LeftChild *HeapElement
 	RightChild *HeapElement
+}
+
+type HaffmanTreeUnit struct {
+	TreeNode *HeapElement
+	Code HaffmanCode
+}
+
+type HaffmanCode struct {
+	BitCode uint32
+	CodeLen uint32
 }

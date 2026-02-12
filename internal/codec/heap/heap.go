@@ -26,20 +26,18 @@ func (heap MinHeap) RecoverUp(index int) {
 	parentElementIndex := (index-1)/2
 
 	if heap[parentElementIndex].Freq > heap[newElementIndex].Freq {
-		recoveredIndex := heap.SwapElements(parentElementIndex, newElementIndex)
-		heap.RecoverUp(recoveredIndex)
+		heap.SwapElements(parentElementIndex, newElementIndex)
+		heap.RecoverUp(parentElementIndex)
 	}
 }
 
 // Поменять 2 узла местами
-func (heap MinHeap) SwapElements(parentIndex, childIndex int) int {
+func (heap MinHeap) SwapElements(parentIndex, childIndex int) {
 	parentElement := heap[parentIndex]
 	childElement := heap[childIndex]
 
 	heap[parentIndex] = childElement
 	heap[childIndex] = parentElement
-
-	return parentIndex // возврат старшего узла
 }
 
 // Проверка корректности кучи
@@ -168,8 +166,9 @@ func (heap MinHeap) RecoverDown(index int) {
 }
 
 // Соединить 2 элемента в узел
-func (heap MinHeap) UnionTwoElement(a, b models.HeapElement) MinHeap {
+func (heap MinHeap) UnionTwoElements(a, b models.HeapElement) MinHeap {
 	newElement := models.HeapElement{
+		Type: "node",
 		Freq: a.Freq + b.Freq,
 		LeftChild: &a,
 		RightChild: &b,

@@ -62,25 +62,70 @@ func buildHaffmanCodes(input []byte) {
 
 	for k, v := range bytesFreq {
 		result = result.AddNewElement(models.HeapElement{
+			Type: "leaf",
 			Value: k,
 			Freq: v,
 		})
 	}
+	fmt.Println(bytesFreq)
 
 	for len(result) > 1 {
 		node1, result = result.GetMinElement()
 		node2, result = result.GetMinElement()
 
 		if node1.Freq < node2.Freq {
-			result = result.UnionTwoElement(node1, node2)
+			result = result.UnionTwoElements(node1, node2)
 		} else {
-			result = result.UnionTwoElement(node2, node1)
+			result = result.UnionTwoElements(node2, node1)
 		}
 	}
 
-	check := result.IsValidHeap()
-	fmt.Println(check)
-	fmt.Println(result[0])
+	bytesCodes := make(map[byte]models.HaffmanCode, 256)
+	DFSstack := []models.HaffmanTreeUnit{}
+	// Проверить корректность указания длины кодов (см результат)
+	DFSstack = append(DFSstack, models.HaffmanTreeUnit{
+		TreeNode: result[0].LeftChild,
+		Code: models.HaffmanCode{
+			BitCode: 0,
+			CodeLen: 1,
+		},
+	})
+	DFSstack = append(DFSstack, models.HaffmanTreeUnit{
+		TreeNode: result[0].RightChild,
+		Code: models.HaffmanCode{
+			BitCode: 1,
+			CodeLen: 1,
+		},
+	})
+
+	for len(DFSstack) > 0 {
+		elem := DFSstack[len(DFSstack)-1]
+		DFSstack = DFSstack[:len(DFSstack)-1]
+		
+		if elem.TreeNode.Type == "leaf" {
+			bytesCodes[elem.TreeNode.Value] = elem.Code
+			continue
+		}
+
+		DFSstack = append(DFSstack, models.HaffmanTreeUnit{
+			TreeNode: elem.TreeNode.LeftChild,
+			Code: models.HaffmanCode{
+				BitCode: elem.Code.BitCode << 1,
+				CodeLen: elem.Code.CodeLen + 1,
+			},
+		})
+		DFSstack = append(DFSstack, models.HaffmanTreeUnit{
+			TreeNode: elem.TreeNode.RightChild,
+			Code: models.HaffmanCode{
+				BitCode: (elem.Code.BitCode << 1) | 1,
+				CodeLen: elem.Code.CodeLen + 1,
+			},
+		})
+	}
+
+	for k, v := range bytesCodes {
+		fmt.Printf("Байт: %d, битовый код: %b, длина кода: %d \n", k, v.BitCode, v.CodeLen)
+	}
 }
 
 func Encode(width, height int, input []byte) ([]byte, error) {
