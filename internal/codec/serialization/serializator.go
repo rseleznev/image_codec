@@ -35,6 +35,8 @@ func Serialize(input []models.RLEEncodedElement) []byte {
 func Deserialize(input []byte) []models.RLEEncodedElement {
 	result := make([]models.RLEEncodedElement, 0, len(input)/7)
 
+	// Здесь может быть ошибка, если данные записаны некорректно!
+	// Сделать тут или ранее проверку количества элементов?
 	for i := 0; i < len(input); i += 7 {
 		var element models.RLEEncodedElement
 		

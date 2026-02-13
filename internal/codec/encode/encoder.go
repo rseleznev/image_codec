@@ -50,7 +50,7 @@ func rleEncode(input []models.DeltaEncodedElement) []models.RLEEncodedElement {
 	return result
 }
 
-func buildHaffmanCodes(input []byte) {
+func buildHaffmanCodes(input []byte) map[byte]models.HaffmanCode {
 	bytesFreq := make(map[byte]int, 256)
 
 	for _, v := range input {
@@ -67,7 +67,6 @@ func buildHaffmanCodes(input []byte) {
 			Freq: v,
 		})
 	}
-	fmt.Println(bytesFreq)
 
 	for len(result) > 1 {
 		node1, result = result.GetMinElement()
@@ -84,17 +83,10 @@ func buildHaffmanCodes(input []byte) {
 	DFSstack := []models.HaffmanTreeUnit{}
 	// Проверить корректность указания длины кодов (см результат)
 	DFSstack = append(DFSstack, models.HaffmanTreeUnit{
-		TreeNode: result[0].LeftChild,
+		TreeNode: result[0],
 		Code: models.HaffmanCode{
 			BitCode: 0,
-			CodeLen: 1,
-		},
-	})
-	DFSstack = append(DFSstack, models.HaffmanTreeUnit{
-		TreeNode: result[0].RightChild,
-		Code: models.HaffmanCode{
-			BitCode: 1,
-			CodeLen: 1,
+			CodeLen: 0,
 		},
 	})
 
@@ -123,30 +115,55 @@ func buildHaffmanCodes(input []byte) {
 		})
 	}
 
-	for k, v := range bytesCodes {
-		fmt.Printf("Байт: %d, битовый код: %b, длина кода: %d \n", k, v.BitCode, v.CodeLen)
-	}
+	// fmt.Println("Таблица на запись!")
+	// for k, v := range bytesCodes {
+	// 	fmt.Printf("Байт: %d, битовый код: %0*b, длина кода: %d \n", k, v.CodeLen, v.BitCode, v.CodeLen)
+	// }
+
+	return bytesCodes
 }
 
-func Encode(width, height int, input []byte) ([]byte, error) {
+func haffmanEncode(codes map[byte]models.HaffmanCode, data []byte) []byte {
+	result := []byte{}
+	var byteBuffer byte
+	var bitsCounter byte
+
+	for _, v := range data {
+		switch {
+		case bitsCounter < 8:
+			// Должна быть проверка, если длина кода больше количества свободных битов
+			
+			byteBuffer = byteBuffer << codes[v].CodeLen | byte(codes[v].BitCode)
+			bitsCounter += byte(codes[v].CodeLen)
+			continue
+
+		case bitsCounter == 8:
+			result = append(result, byteBuffer)
+		}
+	}
+
+	return result
+}
+
+func Encode(width, height int, input []byte) ([]byte, map[byte]models.HaffmanCode, error) {
 	fmt.Println("Входящий массив:", len(input))
 	
 	// Проверки размеров
 	if width > 1000 {
-		return nil, errors.New("превышение ширины изображения")
+		return nil, nil, errors.New("превышение ширины изображения")
 	}
 	if height > 1000 {
-		return nil, errors.New("превышение высоты изображения")
+		return nil, nil, errors.New("превышение высоты изображения")
 	}
 	if width <= 0 || height <= 0 {
-		return nil, errors.New("недопустимые размеры изображения")
+		return nil, nil, errors.New("недопустимые размеры изображения")
 	}
 	
 	pixelsTotal := width * height
 
 	// Проверка количества значений
 	if len(input) != pixelsTotal * 3 {
-		return nil, errors.New("некорректная длина входящего массива")
+		return nil, nil, errors.New("некорректная длина входящего массива")
 	}
 
 	pixelPos := 0
@@ -170,7 +187,8 @@ func Encode(width, height int, input []byte) ([]byte, error) {
 	fmt.Println("Сериализовано данных:", len(serialized))
 
 	// Коды Хаффмана
-	buildHaffmanCodes(serialized)
+	haffmanCodes := buildHaffmanCodes(serialized)
+	haffmanEncode(haffmanCodes, serialized)
 
-	return serialized, nil
+	return serialized, haffmanCodes, nil
 }

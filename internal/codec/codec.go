@@ -20,13 +20,13 @@ func Run(command string, width, height int, inputFile, outputFile string) error 
 		input, err := os.ReadFile(inputFile)
 
 		// Кодирование
-		bytes, err := encode.Encode(width, height, input)
+		bytes, haffmanCodes, err := encode.Encode(width, height, input)
 		if err != nil {
 			return err
 		}
 
 		// Сохраняем файл
-		err = utils.SaveFile(outputFile, width, height, bytes)
+		err = utils.SaveFile(outputFile, width, height, haffmanCodes, bytes)
 		if err != nil {
 			return err
 		}
@@ -42,7 +42,7 @@ func Run(command string, width, height int, inputFile, outputFile string) error 
 		if err != nil {
 			return err
 		}
-		fmt.Println(decodedInput)
+		fmt.Println(decodedInput[0:10])
 	}
 
 	return nil

@@ -8,7 +8,7 @@ import (
 	"image_codec/internal/models"
 )
 
-func SaveFile(fileName string, width, height int, data []byte) error {
+func SaveFile(fileName string, width, height int, haffmanCodeTable map[byte]models.HaffmanCode, data []byte) error {
 	file, err := os.Create(fileName)
 	if err != nil {
 		return err
@@ -41,6 +41,18 @@ func SaveFile(fileName string, width, height int, data []byte) error {
 	err = binary.Write(file, binary.LittleEndian, uint32(len(data)))
 	if err != nil {
 		return err
+	}
+	// Коды Хаффмана
+	// Длина таблицы
+	err = binary.Write(file, binary.LittleEndian, uint16(len(haffmanCodeTable)))
+	if err != nil {
+		return err
+	}
+	// Сама таблица
+	for k, v := range haffmanCodeTable {
+		binary.Write(file, binary.LittleEndian, k) // 1 байт
+		binary.Write(file, binary.LittleEndian, v.BitCode) // 4 байта
+		binary.Write(file, binary.LittleEndian, v.CodeLen) // 4 байта
 	}
 
 	// Пишем данные
@@ -79,6 +91,29 @@ func ReadFile(fileName string) (uint16, uint16, []byte, error) {
 	heightBytes := data[models.HeightOffset:models.DataSizeOffset]
 	heightValue := uint16(heightBytes[0] & 0xFF) | uint16(heightBytes[1]) << 8
 
+	// Читаем таблицу кодов Хаффмана
+	haffmanTableLen := uint16(data[13] & 0xFF) | uint16(data[14]) << 8
+	haffmanTableByteLen := haffmanTableLen * 9
+	dataStartPosition := 15 + haffmanTableByteLen
+
+	// Восстанавливаем таблицу кодов
+	haffmanTable := map[byte]models.HaffmanCode{}
+	for i := 15; haffmanTableLen > 0; haffmanTableLen-- {
+		bitCodeValue := uint32(data[i+1] & 0xFF) | uint32(data[i+2]) << 8 | uint32(data[i+3]) << 16 | uint32(data[i+4]) << 24
+		codeLenValue := uint32(data[i+5] & 0xFF) | uint32(data[i+6]) << 8 | uint32(data[i+7]) << 16 | uint32(data[i+8]) << 24
+		
+		haffmanTable[data[i]] = models.HaffmanCode{
+			BitCode: bitCodeValue,
+			CodeLen: codeLenValue,
+		}
+		i += 9
+	}
+	
+	// fmt.Println("Таблица на чтении!")
+	// for k, v := range haffmanTable {
+	// 	fmt.Printf("Байт: %d, битовый код: %0*b, длина кода: %d \n", k, v.CodeLen, v.BitCode, v.CodeLen)
+	// }
+
 	// Проверка сигнатуры
 	if magic != [4]byte{'R', 'M', 'Z', 0} {
 		fmt.Println("сигнатура файла некорректна")
@@ -96,38 +131,7 @@ func ReadFile(fileName string) (uint16, uint16, []byte, error) {
 
 	fmt.Println("Размеры изображения:", widthValue, heightValue)
 
-	data = data[13:]
-
-	return widthValue, heightValue, data, nil
-}
-
-func ParseFile(input []byte) (uint16, uint16, []byte, error) {
-	magic := [4]byte{}
-	magic[0] = input[0]
-	magic[1] = input[1]
-	magic[2] = input[2]
-	magic[3] = input[3]
-
-	version := input[models.VersionOffset]
-	widthBytes := input[models.WidthOffset:models.HeightOffset]
-	widthValue := uint16(widthBytes[0] & 0xFF) | uint16(widthBytes[1]) << 8
-
-	heightBytes := input[models.HeightOffset:models.DataSizeOffset]
-	heightValue := uint16(heightBytes[0] & 0xFF) | uint16(heightBytes[1]) << 8
-
-	// Проверка сигнатуры
-	if magic != [4]byte{'R', 'M', 'Z', 0} {
-		fmt.Println("сигнатура файла некорректна")
-		return 0, 0, nil, errors.New("сигнатура файла некорректна")
-	}
-
-	// Проверка версии
-	if version != byte(1) {
-		fmt.Println("версия файла некорректна")
-		return 0, 0, nil, errors.New("версия файла некорректна")
-	}
-
-	data := input[13:]
+	data = data[dataStartPosition:]
 
 	return widthValue, heightValue, data, nil
 }
