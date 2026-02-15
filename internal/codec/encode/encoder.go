@@ -1,11 +1,13 @@
 package encode
 
 import (
-	"fmt"
 	"errors"
-	"image_codec/internal/models"
+	"fmt"
+	"image_codec/internal/codec/decode"
 	"image_codec/internal/codec/heap"
 	"image_codec/internal/codec/serialization"
+	"image_codec/internal/models"
+	"slices"
 )
 
 func deltaEncode(input []models.Pixel) []models.DeltaEncodedElement {
@@ -81,7 +83,6 @@ func buildHaffmanCodes(input []byte) map[byte]models.HaffmanCode {
 
 	bytesCodes := make(map[byte]models.HaffmanCode, 256)
 	DFSstack := []models.HaffmanTreeUnit{}
-	// Проверить корректность указания длины кодов (см результат)
 	DFSstack = append(DFSstack, models.HaffmanTreeUnit{
 		TreeNode: result[0],
 		Code: models.HaffmanCode{
@@ -123,26 +124,75 @@ func buildHaffmanCodes(input []byte) map[byte]models.HaffmanCode {
 	return bytesCodes
 }
 
-func haffmanEncode(codes map[byte]models.HaffmanCode, data []byte) []byte {
+// Перепроверить кодирование!
+func haffmanEncode(data []byte, codes map[byte]models.HaffmanCode) ([]byte, byte) {
 	result := []byte{}
 	var byteBuffer byte
-	var bitsCounter byte
+	var bitsToFill byte = 8
+	var filledBytes byte
 
-	for _, v := range data {
-		switch {
-		case bitsCounter < 8:
-			// Должна быть проверка, если длина кода больше количества свободных битов
-			
+	for i, v := range data {
+
+		// Код влезает в буфер
+		if codes[v].CodeLen <= uint32(bitsToFill) {
 			byteBuffer = byteBuffer << codes[v].CodeLen | byte(codes[v].BitCode)
-			bitsCounter += byte(codes[v].CodeLen)
+			bitsToFill -= byte(codes[v].CodeLen)
+			if bitsToFill == 0 {
+				result = append(result, byteBuffer)
+				bitsToFill = 8
+				byteBuffer = 0
+			}
 			continue
+		}
 
-		case bitsCounter == 8:
+		// Код не влезает в буфер
+		// Заполняем текущий буфер насколько можем
+		byteBuffer = byteBuffer << bitsToFill
+		addingBits := byte(codes[v].BitCode >> (codes[v].CodeLen-uint32(bitsToFill)) )
+		byteBuffer = byteBuffer | addingBits
+		bitsLeft := codes[v].CodeLen-uint32(bitsToFill)
+
+		result = append(result, byteBuffer)
+
+		byteBuffer = 0
+		bitsToFill = 8
+		
+		// Докидываем оставшиеся биты
+		for bitsLeft > 0 {
+			// Все оставшиеся биты влезают в буфер
+			if bitsLeft <= uint32(bitsToFill) {
+				addingBits = byte(codes[v].BitCode << 2) // убрать хардкод!
+				byteBuffer |= addingBits // нужно брать только оставшиеся биты
+				bitsToFill -= byte(bitsLeft)
+				bitsLeft = 0
+				// Буфер заполнен
+				if bitsToFill == 0 {
+					result = append(result, byteBuffer)
+					bitsToFill = 8
+					byteBuffer = 0
+				}
+				break
+			}
+
+			// Оставшиеся биты не влезают в один байт
+			addingBits = addingBits << byte(codes[v].CodeLen - bitsLeft)
+			addingBits = addingBits >> byte(codes[v].CodeLen - 8)
+			byteBuffer = addingBits
 			result = append(result, byteBuffer)
+			bitsLeft -= 8
+			bitsToFill = 8
+			byteBuffer = 0
+		}
+		// Дошли до последнего кодируемого байта и остались незаполненные биты
+		if i == len(data)-1 {
+			if bitsToFill > 0 && bitsToFill < 8 {
+				filledBytes = bitsToFill
+				result[len(result)-1] = result[len(result)-1] << bitsToFill
+			}
 		}
 	}
 
-	return result
+	return result, filledBytes
 }
 
 func Encode(width, height int, input []byte) ([]byte, map[byte]models.HaffmanCode, error) {
@@ -188,7 +238,21 @@ func Encode(width, height int, input []byte) ([]byte, map[byte]models.HaffmanCod
 
 	// Коды Хаффмана
 	haffmanCodes := buildHaffmanCodes(serialized)
-	haffmanEncode(haffmanCodes, serialized)
+	serialized = []byte{97}
+	haffmanEncoded, _ := haffmanEncode(serialized, haffmanCodes)
+	fmt.Println("Длина закодированного набора: ", len(haffmanEncoded))
+	fmt.Println(serialized)
+	fmt.Println(haffmanEncoded)
+	
+	haffmanDecoded := decode.HaffmanDecode(haffmanEncoded, haffmanCodes)
+
+	if slices.Equal(serialized, haffmanDecoded) {
+		fmt.Println("Данные совпали!")
+	} else {
+		fmt.Println("Данные не совпали")
+		fmt.Println("Длина декодированного набора: ", len(haffmanDecoded))
+		fmt.Println(haffmanDecoded)
+	}
 
 	return serialized, haffmanCodes, nil
 }

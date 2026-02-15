@@ -43,6 +43,44 @@ func rleDecode(input []models.RLEEncodedElement) []models.DeltaEncodedElement {
 	return result
 }
 
+func HaffmanDecode(input []byte, codes map[byte]models.HaffmanCode) []byte {
+	var result []byte
+	var bitCodeValue, bitCodeLen uint32
+	var usedBits byte
+
+	bitCodeLen = 1
+
+	for _, v := range input {
+		
+		// Собираем искомый код
+		// В текущем байте еще есть неиспользованные биты
+outer:
+		for usedBits < 8 {
+			// Выковыриваем нужные биты
+			decodingByte := v << usedBits
+			usedBits++
+			decodingByte = decodingByte >> 7 // здесь может быть проблема, когда длина кода больше 8
+			bitCodeValue = bitCodeValue | uint32(decodingByte)
+			
+			// Ищем код в таблице
+			for k, c := range codes {
+				if bitCodeLen == c.CodeLen && bitCodeValue == c.BitCode {
+					result = append(result, k)
+					bitCodeLen = 1
+					bitCodeValue = 0
+					continue outer
+				}
+			}
+			// Код не найден
+			bitCodeLen++
+			bitCodeValue = bitCodeValue << 1
+		}
+		usedBits = 0
+	}
+
+	return result
+}
+
 func Decode(width, height uint16, input []byte) ([]byte, error) {
 	// Десериализация
 	inputRLEEncodedPixels := serialization.Deserialize(input)
