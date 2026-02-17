@@ -23,7 +23,7 @@ func SaveFile(fileName string, width, height int, haffmanCodeTable map[byte]mode
 		return err
 	}
 	// Version
-	err = binary.Write(file, binary.LittleEndian, byte(1))
+	err = binary.Write(file, binary.LittleEndian, byte(2))
 	if err != nil {
 		return err
 	}
@@ -65,10 +65,10 @@ func SaveFile(fileName string, width, height int, haffmanCodeTable map[byte]mode
 	return nil
 }
 
-func ReadFile(fileName string) (uint16, uint16, []byte, error) {
+func ReadFile(fileName string) (uint16, uint16, []byte, map[byte]models.HaffmanCode, error) {
 	file, err := os.Open(fileName)
 	if err != nil {
-		return 0, 0, nil, err
+		return 0, 0, nil, nil, err
 	}
 	defer file.Close()
 
@@ -117,14 +117,14 @@ func ReadFile(fileName string) (uint16, uint16, []byte, error) {
 	// Проверка сигнатуры
 	if magic != [4]byte{'R', 'M', 'Z', 0} {
 		fmt.Println("сигнатура файла некорректна")
-		return 0, 0, nil, errors.New("сигнатура файла некорректна")
+		return 0, 0, nil, nil, errors.New("сигнатура файла некорректна")
 	} else {
 		fmt.Println("Сигнатура файла корректна")
 	}
 	// Проверка версии
-	if version != byte(1) {
+	if version != byte(2) {
 		fmt.Println("версия файла некорректна")
-		return 0, 0, nil, errors.New("версия файла некорректна")
+		return 0, 0, nil, nil, errors.New("версия файла некорректна")
 	} else {
 		fmt.Println("Версия файла корректна")
 	}
@@ -133,5 +133,5 @@ func ReadFile(fileName string) (uint16, uint16, []byte, error) {
 
 	data = data[dataStartPosition:]
 
-	return widthValue, heightValue, data, nil
+	return widthValue, heightValue, data, haffmanTable, nil
 }

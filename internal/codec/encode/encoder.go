@@ -3,11 +3,9 @@ package encode
 import (
 	"errors"
 	"fmt"
-	"image_codec/internal/codec/decode"
 	"image_codec/internal/codec/heap"
 	"image_codec/internal/codec/serialization"
 	"image_codec/internal/models"
-	"slices"
 )
 
 func deltaEncode(input []models.Pixel) []models.DeltaEncodedElement {
@@ -124,7 +122,6 @@ func buildHaffmanCodes(input []byte) map[byte]models.HaffmanCode {
 	return bytesCodes
 }
 
-// Перепроверить кодирование!
 func haffmanEncode(data []byte, codes map[byte]models.HaffmanCode) ([]byte, byte) {
 	result := []byte{}
 	var byteBuffer byte
@@ -132,25 +129,42 @@ func haffmanEncode(data []byte, codes map[byte]models.HaffmanCode) ([]byte, byte
 	var filledBytes byte
 
 	for i, v := range data {
+		// fmt.Println()
+		// fmt.Println("!НАЧАЛО ВНЕШНЕГО ЦИКЛА!")
+		// fmt.Printf("Байт: %d, битовый код: %0*b, длина кода: %d \n", v, codes[v].CodeLen, codes[v].BitCode, codes[v].CodeLen)
+		// fmt.Println("Доступно битов в начале внеш цикла: ", bitsToFill)
+		// fmt.Printf("Буфер: %08b \n", byteBuffer)
 
 		// Код влезает в буфер
 		if codes[v].CodeLen <= uint32(bitsToFill) {
+			// fmt.Println("Код влезает в буфер")
 			byteBuffer = byteBuffer << codes[v].CodeLen | byte(codes[v].BitCode)
 			bitsToFill -= byte(codes[v].CodeLen)
+			// fmt.Printf("Буфер: %08b \n", byteBuffer)
 			if bitsToFill == 0 {
 				result = append(result, byteBuffer)
 				bitsToFill = 8
 				byteBuffer = 0
+			}
+			// Если дошли до последнего кодируемого байта
+			if i == len(data)-1 {
+				if bitsToFill > 0 && bitsToFill < 8 {
+					byteBuffer <<= bitsToFill
+					filledBytes = bitsToFill
+					result = append(result, byteBuffer)
+				}
+				break
 			}
 			continue
 		}
 
 		// Код не влезает в буфер
 		// Заполняем текущий буфер насколько можем
-		byteBuffer = byteBuffer << bitsToFill
+		byteBuffer <<= bitsToFill // освобождаем свободные младшие биты
 		addingBits := byte(codes[v].BitCode >> (codes[v].CodeLen-uint32(bitsToFill)) )
-		byteBuffer = byteBuffer | addingBits
+		byteBuffer |= addingBits
 		bitsLeft := codes[v].CodeLen-uint32(bitsToFill)
+		// fmt.Printf("Буфер внеш цикла: %08b \n", byteBuffer)
 
 		result = append(result, byteBuffer)
 
@@ -159,12 +173,19 @@ func haffmanEncode(data []byte, codes map[byte]models.HaffmanCode) ([]byte, byte
 		
 		// Докидываем оставшиеся биты
 		for bitsLeft > 0 {
+			// fmt.Println("!НАЧАЛО ВНУТРЕННЕГО ЦИКЛА!")
+			// fmt.Println("Осталось битов в коде: ", bitsLeft)
 			// Все оставшиеся биты влезают в буфер
 			if bitsLeft <= uint32(bitsToFill) {
-				addingBits = byte(codes[v].BitCode << 2) // убрать хардкод!
-				byteBuffer |= addingBits // нужно брать только оставшиеся биты
+				// fmt.Println("Докидываем все оставшиеся биты")
+				bitCode := byte(codes[v].BitCode << (8 - bitsLeft)) // отсекаем использованные биты слева
+				addingBits = bitCode >> (8 - bitsLeft) // ставим в позицию младших битов
+				// fmt.Printf("Добавляемые биты: %08b \n", addingBits)
+				byteBuffer |= addingBits
+				// fmt.Printf("Буфер внутр цикл: %08b \n", byteBuffer)
 				bitsToFill -= byte(bitsLeft)
 				bitsLeft = 0
+				// fmt.Println("Доступно битов во внутр цикле: ", bitsToFill)
 				// Буфер заполнен
 				if bitsToFill == 0 {
 					result = append(result, byteBuffer)
@@ -174,10 +195,13 @@ func haffmanEncode(data []byte, codes map[byte]models.HaffmanCode) ([]byte, byte
 				break
 			}
 
-			// Оставшиеся биты не влезают в один байт
-			addingBits = addingBits << byte(codes[v].CodeLen - bitsLeft)
-			addingBits = addingBits >> byte(codes[v].CodeLen - 8)
-			byteBuffer = addingBits
+			// fmt.Println("Докидываем биты, сколько влезет")
+			// Оставшиеся биты не влезают в буфер
+			bitCode := codes[v].BitCode << (codes[v].CodeLen - bitsLeft) // отсекаем использованные биты слева
+			addingBits = byte(bitCode >> (codes[v].CodeLen - 8)) // отсекаем биты справа
+			// fmt.Printf("Добавляемые биты: %08b \n", addingBits)
+			byteBuffer |= addingBits
+			// fmt.Printf("Буфер внутр цикл: %08b \n", byteBuffer)
 			result = append(result, byteBuffer)
 			bitsLeft -= 8
 			bitsToFill = 8
@@ -187,7 +211,7 @@ func haffmanEncode(data []byte, codes map[byte]models.HaffmanCode) ([]byte, byte
 		if i == len(data)-1 {
 			if bitsToFill > 0 && bitsToFill < 8 {
 				filledBytes = bitsToFill
-				result[len(result)-1] = result[len(result)-1] << bitsToFill
+				result = append(result, byteBuffer)
 			}
 		}
 	}
@@ -238,21 +262,8 @@ func Encode(width, height int, input []byte) ([]byte, map[byte]models.HaffmanCod
 
 	// Коды Хаффмана
 	haffmanCodes := buildHaffmanCodes(serialized)
-	serialized = []byte{97}
 	haffmanEncoded, _ := haffmanEncode(serialized, haffmanCodes)
 	fmt.Println("Длина закодированного набора: ", len(haffmanEncoded))
-	fmt.Println(serialized)
-	fmt.Println(haffmanEncoded)
-	
-	haffmanDecoded := decode.HaffmanDecode(haffmanEncoded, haffmanCodes)
 
-	if slices.Equal(serialized, haffmanDecoded) {
-		fmt.Println("Данные совпали!")
-	} else {
-		fmt.Println("Данные не совпали")
-		fmt.Println("Длина декодированного набора: ", len(haffmanDecoded))
-		fmt.Println(haffmanDecoded)
-	}
-
-	return serialized, haffmanCodes, nil
+	return haffmanEncoded, haffmanCodes, nil
 }

@@ -48,6 +48,13 @@ func HaffmanDecode(input []byte, codes map[byte]models.HaffmanCode) []byte {
 	var bitCodeValue, bitCodeLen uint32
 	var usedBits byte
 
+	// Переделываем список кодов для ускорения работы
+	codesOptimized := map[models.HaffmanCode]byte{}
+
+	for k, v := range codes {
+		codesOptimized[v] = k
+	}
+
 	bitCodeLen = 1
 
 	for _, v := range input {
@@ -63,13 +70,14 @@ outer:
 			bitCodeValue = bitCodeValue | uint32(decodingByte)
 			
 			// Ищем код в таблице
-			for k, c := range codes {
-				if bitCodeLen == c.CodeLen && bitCodeValue == c.BitCode {
-					result = append(result, k)
-					bitCodeLen = 1
-					bitCodeValue = 0
-					continue outer
-				}
+			if b, ok := codesOptimized[models.HaffmanCode{
+				BitCode: bitCodeValue,
+				CodeLen: bitCodeLen,
+			}]; ok {
+				result = append(result, b)
+				bitCodeLen = 1
+				bitCodeValue = 0
+				continue outer
 			}
 			// Код не найден
 			bitCodeLen++
@@ -81,9 +89,12 @@ outer:
 	return result
 }
 
-func Decode(width, height uint16, input []byte) ([]byte, error) {
+func Decode(width, height uint16, input []byte, codes map[byte]models.HaffmanCode) ([]byte, error) {
+	// Декодирование кодов Хаффмана
+	haffmanEncodedBytes := HaffmanDecode(input, codes)
+	
 	// Десериализация
-	inputRLEEncodedPixels := serialization.Deserialize(input)
+	inputRLEEncodedPixels := serialization.Deserialize(haffmanEncodedBytes)
 
 	// RLE-декодирование
 	inputDeltaEncodedPixels := rleDecode(inputRLEEncodedPixels)

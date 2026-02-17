@@ -32,13 +32,13 @@ func Run(command string, width, height int, inputFile, outputFile string) error 
 		}
 	case "decode":
 		// Чтение файла
-		w, h, fileData, err := utils.ReadFile(outputFile)
+		w, h, fileData, haffmanCodes, err := utils.ReadFile(outputFile)
 		if err != nil {
 			return err
 		}
 
 		// Декодирование
-		decodedInput, err := decode.Decode(w, h, fileData)
+		decodedInput, err := decode.Decode(w, h, fileData, haffmanCodes)
 		if err != nil {
 			return err
 		}
