@@ -75,7 +75,11 @@ func ReadFile(fileName string) (uint16, uint16, []byte, map[byte]models.HaffmanC
 	fileData, _ := os.Stat(fileName)
 
 	data := make([]byte, fileData.Size())
-	n, _ := file.Read(data)
+	n, err := file.Read(data)
+	if err != nil {
+		return 0, 0, nil, nil, err
+	}
+
 	data = data[:n]
 
 	magic := [4]byte{}
@@ -93,16 +97,16 @@ func ReadFile(fileName string) (uint16, uint16, []byte, map[byte]models.HaffmanC
 
 	// Читаем таблицу кодов Хаффмана
 	haffmanTableLen := uint16(data[13] & 0xFF) | uint16(data[14]) << 8
-	haffmanTableByteLen := haffmanTableLen * 9
-	dataStartPosition := 15 + haffmanTableByteLen
+	haffmanTableByteLen := haffmanTableLen * models.HaffmanCodesTableBytesLen
+	dataStartPosition := models.HaffmanCodesTableOffset + haffmanTableByteLen
 
 	// Восстанавливаем таблицу кодов
-	haffmanTable := map[byte]models.HaffmanCode{}
+	haffmanCodesTable := make(map[byte]models.HaffmanCode, 256)
 	for i := 15; haffmanTableLen > 0; haffmanTableLen-- {
 		bitCodeValue := uint32(data[i+1] & 0xFF) | uint32(data[i+2]) << 8 | uint32(data[i+3]) << 16 | uint32(data[i+4]) << 24
 		codeLenValue := uint32(data[i+5] & 0xFF) | uint32(data[i+6]) << 8 | uint32(data[i+7]) << 16 | uint32(data[i+8]) << 24
 		
-		haffmanTable[data[i]] = models.HaffmanCode{
+		haffmanCodesTable[data[i]] = models.HaffmanCode{
 			BitCode: bitCodeValue,
 			CodeLen: codeLenValue,
 		}
@@ -110,7 +114,7 @@ func ReadFile(fileName string) (uint16, uint16, []byte, map[byte]models.HaffmanC
 	}
 	
 	// fmt.Println("Таблица на чтении!")
-	// for k, v := range haffmanTable {
+	// for k, v := range haffmanCodesTable {
 	// 	fmt.Printf("Байт: %d, битовый код: %0*b, длина кода: %d \n", k, v.CodeLen, v.BitCode, v.CodeLen)
 	// }
 
@@ -133,5 +137,5 @@ func ReadFile(fileName string) (uint16, uint16, []byte, map[byte]models.HaffmanC
 
 	data = data[dataStartPosition:]
 
-	return widthValue, heightValue, data, haffmanTable, nil
+	return widthValue, heightValue, data, haffmanCodesTable, nil
 }

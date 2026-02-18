@@ -20,25 +20,25 @@ func Run(command string, width, height int, inputFile, outputFile string) error 
 		input, err := os.ReadFile(inputFile)
 
 		// Кодирование
-		bytes, haffmanCodes, err := encode.Encode(width, height, input)
+		bytes, haffmanCodesTable, err := encode.Encode(width, height, input)
 		if err != nil {
 			return err
 		}
 
 		// Сохраняем файл
-		err = utils.SaveFile(outputFile, width, height, haffmanCodes, bytes)
+		err = utils.SaveFile(outputFile, width, height, haffmanCodesTable, bytes)
 		if err != nil {
 			return err
 		}
 	case "decode":
 		// Чтение файла
-		w, h, fileData, haffmanCodes, err := utils.ReadFile(outputFile)
+		w, h, fileData, haffmanCodesTable, err := utils.ReadFile(outputFile)
 		if err != nil {
 			return err
 		}
 
 		// Декодирование
-		decodedInput, err := decode.Decode(w, h, fileData, haffmanCodes)
+		decodedInput, err := decode.Decode(w, h, fileData, haffmanCodesTable)
 		if err != nil {
 			return err
 		}

@@ -3,6 +3,7 @@ package encode
 import (
 	"errors"
 	"fmt"
+	"image_codec/internal/codec/colormodel"
 	"image_codec/internal/codec/heap"
 	"image_codec/internal/codec/serialization"
 	"image_codec/internal/models"
@@ -57,32 +58,32 @@ func buildHaffmanCodes(input []byte) map[byte]models.HaffmanCode {
 		bytesFreq[v]++
 	}
 
-	var result heap.MinHeap
+	var haffmanTree heap.MinHeap
 	var node1, node2 models.HeapElement
 
 	for k, v := range bytesFreq {
-		result = result.AddNewElement(models.HeapElement{
+		haffmanTree = haffmanTree.AddNewElement(models.HeapElement{
 			Type: "leaf",
 			Value: k,
 			Freq: v,
 		})
 	}
 
-	for len(result) > 1 {
-		node1, result = result.GetMinElement()
-		node2, result = result.GetMinElement()
+	for len(haffmanTree) > 1 {
+		node1, haffmanTree = haffmanTree.GetMinElement()
+		node2, haffmanTree = haffmanTree.GetMinElement()
 
 		if node1.Freq < node2.Freq {
-			result = result.UnionTwoElements(node1, node2)
+			haffmanTree = haffmanTree.UnionTwoElements(node1, node2)
 		} else {
-			result = result.UnionTwoElements(node2, node1)
+			haffmanTree = haffmanTree.UnionTwoElements(node2, node1)
 		}
 	}
 
-	bytesCodes := make(map[byte]models.HaffmanCode, 256)
+	result := make(map[byte]models.HaffmanCode, 256)
 	DFSstack := []models.HaffmanTreeUnit{}
 	DFSstack = append(DFSstack, models.HaffmanTreeUnit{
-		TreeNode: result[0],
+		TreeNode: haffmanTree[0],
 		Code: models.HaffmanCode{
 			BitCode: 0,
 			CodeLen: 0,
@@ -94,7 +95,7 @@ func buildHaffmanCodes(input []byte) map[byte]models.HaffmanCode {
 		DFSstack = DFSstack[:len(DFSstack)-1]
 		
 		if elem.TreeNode.Type == "leaf" {
-			bytesCodes[elem.TreeNode.Value] = elem.Code
+			result[elem.TreeNode.Value] = elem.Code
 			continue
 		}
 
@@ -119,14 +120,13 @@ func buildHaffmanCodes(input []byte) map[byte]models.HaffmanCode {
 	// 	fmt.Printf("Байт: %d, битовый код: %0*b, длина кода: %d \n", k, v.CodeLen, v.BitCode, v.CodeLen)
 	// }
 
-	return bytesCodes
+	return result
 }
 
-func haffmanEncode(data []byte, codes map[byte]models.HaffmanCode) ([]byte, byte) {
+func haffmanEncode(data []byte, codes map[byte]models.HaffmanCode) []byte {
 	result := []byte{}
 	var byteBuffer byte
 	var bitsToFill byte = 8
-	var filledBytes byte
 
 	for i, v := range data {
 		// fmt.Println()
@@ -150,7 +150,6 @@ func haffmanEncode(data []byte, codes map[byte]models.HaffmanCode) ([]byte, byte
 			if i == len(data)-1 {
 				if bitsToFill > 0 && bitsToFill < 8 {
 					byteBuffer <<= bitsToFill
-					filledBytes = bitsToFill
 					result = append(result, byteBuffer)
 				}
 				break
@@ -210,13 +209,12 @@ func haffmanEncode(data []byte, codes map[byte]models.HaffmanCode) ([]byte, byte
 		// Дошли до последнего кодируемого байта и остались незаполненные биты
 		if i == len(data)-1 {
 			if bitsToFill > 0 && bitsToFill < 8 {
-				filledBytes = bitsToFill
 				result = append(result, byteBuffer)
 			}
 		}
 	}
 
-	return result, filledBytes
+	return result
 }
 
 func Encode(width, height int, input []byte) ([]byte, map[byte]models.HaffmanCode, error) {
@@ -240,15 +238,21 @@ func Encode(width, height int, input []byte) ([]byte, map[byte]models.HaffmanCod
 		return nil, nil, errors.New("некорректная длина входящего массива")
 	}
 
-	pixelPos := 0
+	offset := 0
 	rawPixels := make([]models.Pixel, pixelsTotal)
 
 	for i := range rawPixels {
-		rawPixels[i].R = input[pixelPos]
-		rawPixels[i].G = input[pixelPos+1]
-		rawPixels[i].B = input[pixelPos+2]
-		pixelPos += 3
+		rawPixels[i].R = input[offset]
+		rawPixels[i].G = input[offset+1]
+		rawPixels[i].B = input[offset+2]
+		offset += 3
 	}
+
+	// Переводим в YCbCr
+	yChannel, cbChannel, crChannel := colormodel.RGBToYCbCr(rawPixels)
+	fmt.Println(yChannel[0])
+	fmt.Println(cbChannel[0])
+	fmt.Println(crChannel[0])
 
 	// Дельта-кодирование
 	deltaEncodedPixels := deltaEncode(rawPixels)
@@ -261,9 +265,9 @@ func Encode(width, height int, input []byte) ([]byte, map[byte]models.HaffmanCod
 	fmt.Println("Сериализовано данных:", len(serialized))
 
 	// Коды Хаффмана
-	haffmanCodes := buildHaffmanCodes(serialized)
-	haffmanEncoded, _ := haffmanEncode(serialized, haffmanCodes)
+	haffmanCodesTable := buildHaffmanCodes(serialized)
+	haffmanEncoded := haffmanEncode(serialized, haffmanCodesTable)
 	fmt.Println("Длина закодированного набора: ", len(haffmanEncoded))
 
-	return haffmanEncoded, haffmanCodes, nil
+	return haffmanEncoded, haffmanCodesTable, nil
 }

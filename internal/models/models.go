@@ -1,13 +1,19 @@
 package models
 
 const (
-	HeaderSize = 13
-
 	MagicOffset = 0
 	VersionOffset = 4
 	WidthOffset = 5
 	HeightOffset = 7
 	DataSizeOffset = 9
+
+	HaffmanCodesTableOffset = 15
+	HaffmanCodesTableBytesLen = 9
+
+	// Коэффициенты YCbCr модели
+	RedCoef = 0.299
+	GreenCoef = 0.587
+	BlueCoef = 0.114
 )
 
 type Pixel struct {

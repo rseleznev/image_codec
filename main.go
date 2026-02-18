@@ -84,14 +84,14 @@ func main() {
 
 func ViewImage(fileName string) {
 	// Чтение файла
-	w, h, fileData, haffmanCodes, err := utils.ReadFile(fileName)
+	w, h, fileData, haffmanCodesTable, err := utils.ReadFile(fileName)
 	if err != nil {
 		fmt.Println("VIEW: ошибка чтения файла", err)
 		return
 	}
 
 	// Декодирование
-	decodedInput, err := decode.Decode(w, h, fileData, haffmanCodes)
+	decodedInput, err := decode.Decode(w, h, fileData, haffmanCodesTable)
 	if err != nil {
 		fmt.Println("VIEW: ошибка декодирования данных")
 	}
@@ -99,7 +99,7 @@ func ViewImage(fileName string) {
 	// Собираем картинку
 	image := buildImage(int(w), int(h), decodedInput)
 
-	// Запускаем просмотрщика
+	// Инициализируем просмотрщик
 	myApp := app.New()
     window := myApp.NewWindow("MyCodec Viewer - " + fileName)
 

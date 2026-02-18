@@ -43,11 +43,7 @@ func (heap MinHeap) SwapElements(parentIndex, childIndex int) {
 // Проверка корректности кучи
 func (heap MinHeap) IsValidHeap() bool {
 	result := true
-	// Временная заглушка
-	// Будет проверка, есть ли у корня потомки
-	if len(heap) < 3 {
-		return result
-	}
+	// Не будет лишним сделать проверку потомков корневого узла
 	
 	// Проверяем двух первых потомков
 	if heap[0].Freq > heap[1].Freq || heap[0].Freq > heap[2].Freq {
@@ -93,14 +89,14 @@ func (heap MinHeap) IsValidHeap() bool {
 
 // Получить минимальный узел (корень)
 func (heap MinHeap) GetMinElement() (models.HeapElement, MinHeap) {
-	minElement := *heap[0]
+	minElement := heap[0]
 	heap[0] = heap[len(heap)-1]
 	heap = heap[:len(heap)-1]
 
 	// Восстанавливаем кучу
 	heap.RecoverDown(0)
 
-	return minElement, heap
+	return *minElement, heap
 }
 
 // Восстановление кучи вниз после удаления корня

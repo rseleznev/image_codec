@@ -43,16 +43,16 @@ func rleDecode(input []models.RLEEncodedElement) []models.DeltaEncodedElement {
 	return result
 }
 
-func HaffmanDecode(input []byte, codes map[byte]models.HaffmanCode) []byte {
+func haffmanDecode(input []byte, haffmanCodesTable map[byte]models.HaffmanCode) []byte {
 	var result []byte
 	var bitCodeValue, bitCodeLen uint32
 	var usedBits byte
 
 	// Переделываем список кодов для ускорения работы
-	codesOptimized := map[models.HaffmanCode]byte{}
+	haffmanCodesTableOptimized := map[models.HaffmanCode]byte{}
 
-	for k, v := range codes {
-		codesOptimized[v] = k
+	for k, v := range haffmanCodesTable {
+		haffmanCodesTableOptimized[v] = k
 	}
 
 	bitCodeLen = 1
@@ -67,10 +67,10 @@ outer:
 			decodingByte := v << usedBits
 			usedBits++
 			decodingByte = decodingByte >> 7 // здесь может быть проблема, когда длина кода больше 8
-			bitCodeValue = bitCodeValue | uint32(decodingByte)
+			bitCodeValue |= uint32(decodingByte)
 			
 			// Ищем код в таблице
-			if b, ok := codesOptimized[models.HaffmanCode{
+			if b, ok := haffmanCodesTableOptimized[models.HaffmanCode{
 				BitCode: bitCodeValue,
 				CodeLen: bitCodeLen,
 			}]; ok {
@@ -89,9 +89,9 @@ outer:
 	return result
 }
 
-func Decode(width, height uint16, input []byte, codes map[byte]models.HaffmanCode) ([]byte, error) {
+func Decode(width, height uint16, input []byte, haffmanCodesTable map[byte]models.HaffmanCode) ([]byte, error) {
 	// Декодирование кодов Хаффмана
-	haffmanEncodedBytes := HaffmanDecode(input, codes)
+	haffmanEncodedBytes := haffmanDecode(input, haffmanCodesTable)
 	
 	// Десериализация
 	inputRLEEncodedPixels := serialization.Deserialize(haffmanEncodedBytes)
@@ -114,15 +114,15 @@ func Decode(width, height uint16, input []byte, codes map[byte]models.HaffmanCod
 	inputRawPixels := deltaDecode(inputDeltaEncodedPixels)
 
 	valuesTotal := len(inputRawPixels)*3
-	valueIndex := 0
+	offset := 0
 	result := make([]byte, valuesTotal)
 
 	for _, v := range inputRawPixels {
-		result[valueIndex] = v.R
-		result[valueIndex+1] = v.G
-		result[valueIndex+2] = v.B
+		result[offset] = v.R
+		result[offset+1] = v.G
+		result[offset+2] = v.B
 
-		valueIndex += 3
+		offset += 3
 	}
 
 	// Проверка кол-ва данных
